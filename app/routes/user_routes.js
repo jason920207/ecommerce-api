@@ -90,14 +90,6 @@ router.post('/sign-in', (req, res, next) => {
       }
     })
     .then(user => {
-      if (user.email === 'jenny@gmail.com' || user.email === 'carlo@gmail.com') {
-        user.admin = true
-      } else {
-        user.admin = false
-      }
-      return user
-    })
-    .then(user => {
       // return status 201, the email, and the new token
       res.status(201).json({ user: user.toObject() })
     })
