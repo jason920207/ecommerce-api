@@ -2,7 +2,7 @@
 const express = require('express')
 // Passport docs: http://www.passportjs.org/docs/
 const passport = require('passport')
-
+const checkoutAdmin = require('../../lib/checkout_admin')
 // pull in Mongoose model for products
 const Product = require('../models/product')
 
@@ -60,11 +60,13 @@ router.get('/products/:id', (req, res, next) => {
 
 // CREATE
 // POST /products
-router.post('/products', (req, res, next) => {
+router.post('/products', requireToken, checkoutAdmin, (req, res, next) => {
   // set owner of new product to be current user
   // req.body.product.owner = req.user.id
-  Product.collection.drop()
-  Product.create(productSeed)
+  // Product.collection.drop()
+
+
+  Product.create({})
     // respond to succesful `create` with status 201 and JSON of new "product"
     .then(products => {
       res.status(201).json({ products: products })
