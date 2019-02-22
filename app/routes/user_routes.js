@@ -25,6 +25,10 @@ const requireToken = passport.authenticate('bearer', { session: false })
 // instantiate a router (mini app that only handles routes)
 const router = express.Router()
 
+const checkAdmin = require('../../lib/check_admin')
+const customErrors = require('../../lib/custom_errors')
+const handle404 = customErrors.handle404
+
 // SIGN UP
 // POST /sign-up
 router.post('/sign-up', (req, res, next) => {
@@ -96,6 +100,49 @@ router.post('/sign-in', (req, res, next) => {
     .catch(next)
 })
 
+// SIGN IN
+// POST /sign-in
+router.post('/adminSign-in', (req, res, next) => {
+  const pw = req.body.credentials.password
+  let user
+  // find a user based on the email that was passed
+  User.findOne({ email: req.body.credentials.email })
+    .then(record => {
+      // if we didn't find a user with that email, send 401
+      if (!record) {
+        throw new BadCredentialsError()
+      }
+      // save the found user outside the promise chain
+      user = record
+      // `bcrypt.compare` will return true if the result of hashing `pw`
+      // is exactly equal to the hashed password stored in the DB
+      return bcrypt.compare(pw, user.hashedPassword)
+    })
+    .then(correctPassword => {
+      // if the passwords matched
+      if (correctPassword) {
+        // the token will be a 16 byte random hex string
+        const token = crypto.randomBytes(16).toString('hex')
+        user.token = token
+        // save the token to the DB as a property on user
+        return user.save()
+      } else {
+        // throw an error to trigger the error handler and end the promise chain
+        // this will send back 401 and a message about sending wrong parameters
+        throw new BadCredentialsError()
+      }
+    })
+    .then(user => {
+      // return status 201, the email, and the new token
+      if (user.admin) {
+        res.status(201).json({ user: user.toObject() })
+      } else {
+        throw new BadCredentialsError()
+      }
+    })
+    .catch(next)
+})
+
 // CHANGE password
 // PATCH /change-password
 router.patch('/change-password', requireToken, (req, res, next) => {
@@ -134,6 +181,40 @@ router.delete('/sign-out', requireToken, (req, res, next) => {
   // save the token and respond with 204
   req.user.save()
     .then(() => res.sendStatus(204))
+    .catch(next)
+})
+
+router.get('/users', requireToken, checkAdmin, (req, res, next) => {
+  User.find()
+    .then(users => {
+      // `examples` will be an array of Mongoose documents
+      // we want to convert each one to a POJO, so we use `.map` to
+      // apply `.toObject` to each one
+      return users.map(user => user.toObject())
+    })
+    // respond with status 200 and JSON of the examples
+    .then(users => res.status(200).json({ users: users }))
+    // if an error occurs, pass it to the handler
+    .catch(next)
+})
+
+// UPDATE
+// PATCH /examples/5a7db6c74d55bc51bdf39793
+router.patch('/users/:id', requireToken, (req, res, next) => {
+  // if the client attempts to change the `owner` property by including a new
+  // owner, prevent that by deleting that key/value pair
+
+  User.findById(req.params.id)
+    .then(handle404)
+    .then(user => {
+      // pass the `req` object and the Mongoose record to `requireOwnership`
+      // it will throw an error if the current user isn't the owner
+      // pass the result of Mongoose's `.update` to the next `.then`
+      return user.update(req.body.user)
+    })
+    // if that succeeded, return 204 and no JSON
+    .then(() => res.sendStatus(204))
+    // if an error occurs, pass it to the handler
     .catch(next)
 })
 

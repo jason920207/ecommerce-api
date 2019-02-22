@@ -2,7 +2,7 @@
 const express = require('express')
 // Passport docs: http://www.passportjs.org/docs/
 const passport = require('passport')
-const checkoutAdmin = require('../../lib/checkout_admin')
+const checkAdmin = require('../../lib/check_admin')
 // pull in Mongoose model for products
 const Product = require('../models/product')
 
@@ -28,7 +28,11 @@ const requireToken = passport.authenticate('bearer', { session: false })
 const router = express.Router()
 
 // get product information from seed file
-const productSeed = require('../../config/seed.js')
+// const productSeed = require('../../config/seed.js')
+
+const multer = require('multer')
+const upload = multer({ dest: 'uploads/' })
+const promiseS3Upload = require('../../lib/promiseS3Upload')
 
 // INDEX
 // GET /products
@@ -60,22 +64,44 @@ router.get('/products/:id', (req, res, next) => {
 
 // CREATE
 // POST /products
-router.post('/products', requireToken, checkoutAdmin, (req, res, next) => {
+router.post('/products', requireToken, checkAdmin, upload.single('image'), (req, res, next) => {
   // set owner of new product to be current user
   // req.body.product.owner = req.user.id
   // Product.collection.drop()
 
-
-  Product.create({})
-    // respond to succesful `create` with status 201 and JSON of new "product"
-    .then(products => {
-      res.status(201).json({ products: products })
+  promiseS3Upload(req)
+    .then(awsResponse => {
+      console.log(awsResponse)
     })
+
+    // respond to succesful `create` with status 201 and JSON of new "upload"
+    // .then(upload => {
+    //   res.status(201).json({ upload: upload.toObject() })
+    // })
     // if an error occurs, pass it off to our error handler
     // the error handler needs the error message and the `res` object so that it
     // can send an error message back to the client
     .catch(next)
 })
+
+// // CREATE
+// // POST /uploads
+// router.post('/uploads', upload.single('image'), (req, res, next) => {
+//   console.log("incoming req.file  is ", req.file)
+//   promiseS3Upload(req)
+//     .then(awsResponse => {
+//       console.log(awsResponse)
+//     })
+//
+//     // respond to succesful `create` with status 201 and JSON of new "upload"
+//     // .then(upload => {
+//     //   res.status(201).json({ upload: upload.toObject() })
+//     // })
+//     // if an error occurs, pass it off to our error handler
+//     // the error handler needs the error message and the `res` object so that it
+//     // can send an error message back to the client
+//     .catch(next)
+// })
 
 // UPDATE
 // PATCH /products/5a7db6c74d55bc51bdf39793
